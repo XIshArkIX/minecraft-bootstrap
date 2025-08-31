@@ -1,0 +1,8 @@
+# Zig cache
+.zig-cache/
+
+# Zig output
+zig-out/
+
+# Temporary files
+data/
