@@ -1,0 +1,118 @@
+---
+description: Naming Convention
+globs: *.zig
+alwaysApply: true
+---
+
+# ZigLang Naming Convention Agreement
+
+## 1. General Principles
+- Use **camelCase** for variables, functions, object properties
+- Use **PascalCase** for classes, constructors
+- Use **UPPER_SNAKE_CASE** for constants (values known before execution and immutable)
+- Names should be **meaningful** and in English
+- Avoid abbreviations except for commonly accepted ones (e.g., `id`, `url`, `API`)
+
+## 2. Variables and Functions
+```zig
+// camelCase
+var userName = "John";
+const maxItems = 10;
+
+fn getUserData() { ... }
+fn calculateTotalPrice() { ... }
+```
+
+## 3. Structures and their Constructors
+
+```zig
+// PascalCase
+const UserProfile = struct { ... }
+fn DatabaseConnection() { ... } // constructor
+```
+
+## 4. Constants
+
+```zig
+// UPPER_SNAKE_CASE for immutable values
+const API_ENDPOINT = "https://api.example.com";
+const MAX_RETRY_ATTEMPTS = 3;
+```
+
+## 5. Private Fields and Methods
+
+```zig
+// Prefix _ for protected/private (conventionally)
+const User = struct {
+  init(self: *User) {
+    self._internalId = 1; // "protected" field
+  }
+
+  _privateHelperMethod() { ... } // for internal use
+}
+```
+
+## 6. Boolean Variables/Functions
+
+* Use prefixes is, has, can, should:
+
+```zig
+var isActive = true;
+const hasPermission = false;
+fn isValid() { ... }
+```
+
+## 7. Arrays, slices, sentinels
+
+* Use plural names or with explanatory suffix:
+
+```zig
+const users = .{"John", "Alice"};
+const userList = [...];
+```
+
+## 8. Modules (Import/Export)
+
+* File names: kebab-case (e.g., user-service.zig)
+* Export names: camelCase/PascalCase
+
+```zig
+// Import
+const validateSemver = @import("utils/validate-semver.zig");
+
+// Export
+pub const apiKey = "abc123";
+pub const HttpClient = struct { ... }
+```
+
+## 9. Events and Handlers
+
+* Use prefixes on or handle for handlers:
+
+```zig
+fn onClick() { ... }
+fn handleSubmit() { ... }
+```
+
+## 10. Exceptions
+
+* Use suffix Error for errors:
+
+```zig
+const myErrorsUnion = error.ValidationError || error.NotSetError;
+```
+
+## 11. Good vs Bad Examples
+| Bad |	Good |
+|---|---|
+| var a = 5; | var itemCount = 5; |
+| fn calc() { ... } |	fn calculateTotal() { ... } |
+| const c = 'USD'; |	const CURRENCY = 'USD'; |
+| const userProfile = struct { ... } |	const UserProfile = struct { ... } |
+
+
+## 12. Additional Recommendations
+
+* Avoid single-letter names (except for iterators like i, j in loops)
+* For abbreviations: either all letters in same case (XMLHttpRequest) or camelCase (getUserById)
+* Use consistent names for same entities (e.g., userId everywhere, not id/userID/uid)
