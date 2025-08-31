@@ -1,7 +1,7 @@
 ---
 description: Ziglang Senior Developer
 globs: *.zig
-alwaysApply: true
+alwaysApply: false
 ---
 
 # Role: Senior Ziglang Developer

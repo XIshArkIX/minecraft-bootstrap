@@ -1,7 +1,7 @@
 ---
 description: Naming Convention
 globs: *.zig
-alwaysApply: true
+alwaysApply: false
 ---
 
 # ZigLang Naming Convention Agreement
