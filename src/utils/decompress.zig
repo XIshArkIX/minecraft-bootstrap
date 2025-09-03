@@ -130,6 +130,85 @@ pub fn estimateGzipDecompressedSize(compressed_size: usize) usize {
     return compressed_size * 3;
 }
 
+/// Decompresses deflate compressed data (raw deflate without container headers)
+///
+/// Args:
+///   allocator: Memory allocator to use for the decompressed data
+///   compressed_data: Raw bytes of deflate compressed data
+///   uncompressed_size: Expected size of uncompressed data (from ZIP header)
+///
+/// Returns:
+///   Decompressed data as a slice of bytes. Caller owns this memory.
+///
+/// Errors:
+///   - error.OutOfMemory: If allocation fails
+///   - error.InvalidData: If the compressed data is malformed
+///   - error.EndOfStream: If the compressed data is truncated
+///   - error.SizeMismatch: If decompressed size doesn't match expected size
+pub fn decompressDeflate(allocator: Allocator, compressed_data: []const u8, uncompressed_size: u32) ![]u8 {
+    // Handle special case of empty data
+    if (uncompressed_size == 0) {
+        return try allocator.alloc(u8, 0);
+    }
+
+    // Create a fixed reader from the compressed data
+    var reader: std.Io.Reader = .fixed(compressed_data);
+
+    // Initialize deflate decompressor with raw container (no headers)
+    var history_buffer: [std.compress.flate.max_window_len]u8 = undefined;
+    var decompress = std.compress.flate.Decompress.init(&reader, .raw, &history_buffer);
+
+    // Allocate buffer for decompressed data
+    var decompressed_data = try allocator.alloc(u8, uncompressed_size);
+    errdefer allocator.free(decompressed_data);
+
+    // Decompress data in chunks
+    var total_read: usize = 0;
+    var chunk: [4096]u8 = undefined;
+
+    while (total_read < uncompressed_size) {
+        const remaining = uncompressed_size - total_read;
+        const chunk_size = @min(chunk.len, remaining);
+
+        const bytes_read = decompress.reader.readSliceShort(chunk[0..chunk_size]) catch |err| switch (err) {
+            error.ReadFailed => {
+                if (total_read == uncompressed_size) break;
+                return error.InvalidData;
+            },
+            else => return err,
+        };
+
+        if (bytes_read == 0) {
+            if (total_read < uncompressed_size) {
+                return error.EndOfStream;
+            }
+            break;
+        }
+
+        @memcpy(decompressed_data[total_read .. total_read + bytes_read], chunk[0..bytes_read]);
+        total_read += bytes_read;
+    }
+
+    // Verify we got the expected amount of data
+    if (total_read != uncompressed_size) {
+        std.log.err("Deflate decompression size mismatch: expected {}, got {}", .{ uncompressed_size, total_read });
+        return error.SizeMismatch;
+    }
+
+    return decompressed_data;
+}
+
+/// Checks if the given compression method is deflate
+///
+/// Args:
+///   compression_method: ZIP compression method code
+///
+/// Returns:
+///   true if the compression method is deflate (8), false otherwise
+pub fn isDeflateCompression(compression_method: u16) bool {
+    return compression_method == 8;
+}
+
 test "gzip detection" {
     // Test with empty data
     try std.testing.expect(!isGzipCompressed(""));
@@ -332,6 +411,8 @@ fn extractZipFile(
     const targetPath = try std.fmt.allocPrint(allocator, "{s}/{s}", .{ targetDir, filename });
     defer allocator.free(targetPath);
 
+    std.debug.print("Extracting file: {s} to {s}\n", .{ filename, targetPath });
+
     // Ensure parent directories exist
     if (std.fs.path.dirname(targetPath)) |parentDir| {
         std.fs.makeDirAbsolute(parentDir) catch |err| switch (err) {
@@ -349,8 +430,14 @@ fn extractZipFile(
             try file.writeAll(compressedData);
         },
         8 => { // Deflate compression
-            std.log.warn("Deflate compression not yet supported for file: {s}", .{filename});
-            return error.UnsupportedCompressionMethod;
+            const uncompressed_size = std.mem.readInt(u32, localFileHeader[22..26][0..4], .little);
+            const decompressed_data = decompressDeflate(allocator, compressedData, uncompressed_size) catch |err| {
+                std.log.err("Failed to decompress deflate data for file {s}: {any}", .{ filename, err });
+                return err;
+            };
+            defer allocator.free(decompressed_data);
+
+            try file.writeAll(decompressed_data);
         },
         else => {
             std.log.warn("Unsupported compression method {} for file: {s}", .{ compressionMethod, filename });
@@ -383,4 +470,63 @@ test "decompress empty data" {
     // This should fail
     const result = decompressGzip(allocator, empty_data);
     try std.testing.expectError(error.InvalidData, result);
+}
+
+test "deflate compression detection" {
+    // Test deflate compression method detection
+    try std.testing.expect(isDeflateCompression(8));
+    try std.testing.expect(!isDeflateCompression(0)); // Stored
+    try std.testing.expect(!isDeflateCompression(1)); // Shrunk
+    try std.testing.expect(!isDeflateCompression(12)); // BZIP2
+    try std.testing.expect(!isDeflateCompression(14)); // LZMA
+}
+
+test "deflate decompression with known data" {
+    const allocator = std.testing.allocator;
+
+    // For testing purposes, we'll create a minimal deflate stream manually
+    // This is a deflate-compressed version of "Hello" (for testing)
+    // Generated using standard deflate compression with no headers
+    const deflate_data = [_]u8{
+        0xf3, 0x48, 0xcd, 0xc9, 0xc9, 0x07, 0x00, // "Hello" compressed with deflate
+    };
+
+    const expected_output = "Hello";
+    const uncompressed_size: u32 = expected_output.len;
+
+    const result = decompressDeflate(allocator, &deflate_data, uncompressed_size) catch |err| {
+        std.debug.print("Deflate decompression failed: {any}\n", .{err});
+        return err;
+    };
+    defer allocator.free(result);
+
+    try std.testing.expectEqualStrings(expected_output, result);
+}
+
+test "deflate decompression size mismatch" {
+    const allocator = std.testing.allocator;
+
+    // Use the same deflate data but wrong expected size
+    const deflate_data = [_]u8{
+        0xf3, 0x48, 0xcd, 0xc9, 0xc9, 0x07, 0x00, // "Hello" compressed
+    };
+
+    const wrong_size: u32 = 100; // Much larger than actual
+
+    const result = decompressDeflate(allocator, &deflate_data, wrong_size);
+    try std.testing.expectError(error.EndOfStream, result);
+}
+
+test "deflate decompression with empty input" {
+    const allocator = std.testing.allocator;
+
+    const empty_data: []const u8 = "";
+    const uncompressed_size: u32 = 0;
+
+    // Empty input with size 0 should succeed and return empty data
+    const result = try decompressDeflate(allocator, empty_data, uncompressed_size);
+    defer allocator.free(result);
+
+    // Result should be empty
+    try std.testing.expectEqual(@as(usize, 0), result.len);
 }
