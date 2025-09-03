@@ -197,6 +197,18 @@ pub fn isZipCompressed(data: []const u8) bool {
 ///   - error.FileNotFound: If target directory doesn't exist
 ///   - error.PermissionDenied: If insufficient permissions
 pub fn extractZip(allocator: std.mem.Allocator, zipData: []const u8, targetDir: []const u8) !void {
+    // Validate ZIP data format first
+    if (!isZipCompressed(zipData)) {
+        std.log.err("Data does not appear to be a valid ZIP file (missing PK signature)", .{});
+        return error.InvalidData;
+    }
+
+    // Ensure we have minimum data for a ZIP file
+    if (zipData.len < 22) {
+        std.log.err("ZIP data too small: {} bytes (minimum 22 bytes required)", .{zipData.len});
+        return error.InvalidData;
+    }
+
     // Create a fixed buffer reader from the ZIP data
     var fbs = std.io.fixedBufferStream(zipData);
     _ = fbs.reader();
@@ -209,27 +221,50 @@ pub fn extractZip(allocator: std.mem.Allocator, zipData: []const u8, targetDir: 
 
     // Search for EOCD signature from the end
     if (zipData.len >= 22) { // Minimum EOCD size
-        var searchOffset: usize = zipData.len;
-        while (searchOffset >= 4) {
-            searchOffset -= 1;
+        var searchOffset: usize = zipData.len - 4; // Start from a position where we can read 4 bytes
+        while (searchOffset > 0) {
             const signature = std.mem.readInt(u32, zipData[searchOffset .. searchOffset + 4][0..4], .little);
             if (signature == eocdSignature) {
                 eocdOffset = searchOffset;
                 break;
             }
+            searchOffset -= 1;
+        }
+
+        // Check the first position (searchOffset == 0) as well
+        if (eocdOffset == null and zipData.len >= 4) {
+            const signature = std.mem.readInt(u32, zipData[0..4][0..4], .little);
+            if (signature == eocdSignature) {
+                eocdOffset = 0;
+            }
         }
     }
 
     if (eocdOffset == null) {
+        std.log.err("EOCD signature not found in ZIP data. File may be corrupted or not a valid ZIP archive.", .{});
         return error.InvalidData;
     }
 
     // Parse EOCD record
     const eocd = zipData[eocdOffset.?..];
-    if (eocd.len < 22) return error.InvalidData;
+    if (eocd.len < 22) {
+        std.log.err("EOCD record too small: {} bytes (minimum 22 bytes required)", .{eocd.len});
+        return error.InvalidData;
+    }
 
     const centralDirSize = std.mem.readInt(u32, eocd[12..16][0..4], .little);
     const centralDirOffset = std.mem.readInt(u32, eocd[16..20][0..4], .little);
+
+    // Validate central directory bounds
+    if (centralDirOffset >= zipData.len) {
+        std.log.err("Central directory offset {} exceeds ZIP data size {}", .{ centralDirOffset, zipData.len });
+        return error.InvalidData;
+    }
+
+    if (centralDirOffset + centralDirSize > zipData.len) {
+        std.log.err("Central directory (offset: {}, size: {}) exceeds ZIP data bounds (size: {})", .{ centralDirOffset, centralDirSize, zipData.len });
+        return error.InvalidData;
+    }
 
     // Read central directory entries
     var currentOffset: usize = centralDirOffset;
