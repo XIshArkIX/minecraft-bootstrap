@@ -5,3 +5,4 @@ pub const extractServerJarUrl = @import("utils/extract-server-jar-url.zig");
 pub const httpRequest = @import("utils/http-request.zig");
 pub const decompress = @import("utils/decompress.zig");
 pub const validateSemver = @import("utils/validate-semver.zig");
+pub const curseforgeApi = @import("utils/curseforge-api.zig");
