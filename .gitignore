@@ -1,8 +1,15 @@
-# Zig cache
-.zig-cache/
-
-# Zig output
-zig-out/
-
-# Temporary files
+# Created by venv; see https://docs.python.org/3/library/venv.html
+bin/
 data/
+dist/
+lib/
+include/
+**/__pycache__/
+*.egg-info/
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+*.pyz
+*.pywz
+*.pyzw

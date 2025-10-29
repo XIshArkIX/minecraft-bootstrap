@@ -1,10 +1,9 @@
 ---
 description: Naming Convention
-globs: *.zig
+globs: *.zig,*.py
 alwaysApply: false
 ---
-
-# ZigLang Naming Convention Agreement
+# ZigLang and Python Naming Convention Agreement
 
 ## 1. General Principles
 - Use **camelCase** for variables, functions, object properties
@@ -23,6 +22,20 @@ fn getUserData() { ... }
 fn calculateTotalPrice() { ... }
 ```
 
+```python
+# camelCase
+userName = "John"
+maxItems = 10
+
+
+def getUserData():
+  pass
+
+
+def calculateTotalPrice():
+  pass
+```
+
 ## 3. Structures and their Constructors
 
 ```zig
@@ -31,12 +44,30 @@ const UserProfile = struct { ... }
 fn DatabaseConnection() { ... } // constructor
 ```
 
+```python
+# PascalCase
+class UserProfile:
+  def __init__(self):
+    self.profileData = {}
+
+
+class DatabaseConnection:
+  def __init__(self):
+    self.connectionString = ""
+```
+
 ## 4. Constants
 
 ```zig
 // UPPER_SNAKE_CASE for immutable values
 const API_ENDPOINT = "https://api.example.com";
 const MAX_RETRY_ATTEMPTS = 3;
+```
+
+```python
+# UPPER_SNAKE_CASE for immutable values
+API_ENDPOINT = "https://api.example.com"
+MAX_RETRY_ATTEMPTS = 3
 ```
 
 ## 5. Private Fields and Methods
@@ -52,6 +83,16 @@ const User = struct {
 }
 ```
 
+```python
+# Prefix _ for protected/private (by convention)
+class User:
+  def __init__(self):
+    self._internalId = 1
+
+  def _privateHelperMethod(self):
+    return self._internalId
+```
+
 ## 6. Boolean Variables/Functions
 
 * Use prefixes is, has, can, should:
@@ -62,6 +103,15 @@ const hasPermission = false;
 fn isValid() { ... }
 ```
 
+```python
+isActive = True
+hasPermission = False
+
+
+def isValid(userData):
+  return bool(userData)
+```
+
 ## 7. Arrays, slices, sentinels
 
 * Use plural names or with explanatory suffix:
@@ -69,6 +119,11 @@ fn isValid() { ... }
 ```zig
 const users = .{"John", "Alice"};
 const userList = [...];
+```
+
+```python
+users = ["John", "Alice"]
+userList = list(users)
 ```
 
 ## 8. Modules (Import/Export)
@@ -85,6 +140,22 @@ pub const apiKey = "abc123";
 pub const HttpClient = struct { ... }
 ```
 
+* Python modules and packages: snake_case file names (e.g., user_service.py)
+* Export names: camelCase for functions, PascalCase for classes
+
+```python
+# Import
+from utils.validate_semver import validateSemver
+
+# Export
+def apiKey():
+  return "abc123"
+
+
+class HttpClient:
+  pass
+```
+
 ## 9. Events and Handlers
 
 * Use prefixes on or handle for handlers:
@@ -94,12 +165,30 @@ fn onClick() { ... }
 fn handleSubmit() { ... }
 ```
 
+```python
+def onClick():
+  pass
+
+
+def handleSubmit(formData):
+  return formData
+```
+
 ## 10. Exceptions
 
 * Use suffix Error for errors:
 
 ```zig
 const myErrorsUnion = error.ValidationError || error.NotSetError;
+```
+
+```python
+class ValidationError(Exception):
+  pass
+
+
+class NotSetError(Exception):
+  pass
 ```
 
 ## 11. Good vs Bad Examples
