@@ -34,4 +34,5 @@ class ModpackExtractionError(ApplicationError):
     pass
 
 
-
+class InstallationError(ApplicationError):
+    pass

@@ -1,88 +1,83 @@
-from __future__ import annotations
-
+import argparse
 import sys
-
-from constants import ServerType
-from errors import ApplicationError, CurseForgeApiError
-from utils.environment import (
-    EnvironmentConfig,
-    collectEnvironment,
-    printStatus,
-)
-from utils.files import createEulaFile, downloadFile, extractZipArchive
-from utils.curseforge_api import CurseForgeClient, extractDownloadUrl
-from utils.http_client import fetchServerJarUrl, testHttpConnectivity
+from pathlib import Path
+from typing import Dict
+from errors import ApplicationError
+from utils.server_customization import downloadServerIcon, customizeServerProperties
+from utils.vanilla_module import vanillaBootstrap
+from utils.manual_module import manualBootstrap
+# from utils.curseforge_module import curseforgeBootstrap
 
 
+parser = argparse.ArgumentParser(description="Playtime Minecraft Bootstrap")
+parser.add_argument("--accept-eula",
+                    help="Accept the EULA", type=bool, required=True)
+parser.add_argument("--type", type=str, required=True, help="The type of server to bootstrap",
+                    choices=["vanilla", "curseforge", "manual"])
+parser.add_argument("--destination", type=str, required=True,
+                    help="The destination of the server to bootstrap")
+parser.add_argument("--version", type=str,
+                    help="The Minecraft version to bootstrap")
+parser.add_argument("--server-pack-url", type=str,
+                    help="The URL of the server pack to bootstrap")
+parser.add_argument("--server-icon-url", type=str,
+                    help="The URL of the server icon to use")
+parser.add_argument("--server-property",
+                    dest="server_properties",
+                    action="append",
+                    default=[],
+                    metavar="KEY=VALUE",
+                    help="Override entries in server.properties (can be passed multiple times)")
 
 
-def handleVanillaServer(config: EnvironmentConfig) -> None:
-    print("Preparing VANILLA server bootstrap...")
-
-    eulaPath = createEulaFile(config.workingDir)
-    printStatus("EULA file", True, str(eulaPath))
-
-    print("Testing HTTP connectivity...")
-    testHttpConnectivity()
-    printStatus("HTTP connectivity", True)
-
-    print("Fetching server.jar URL...")
-    serverJarUrl = fetchServerJarUrl(config.version)
-    printStatus("Server.jar URL", True, serverJarUrl)
-
-    destination = config.workingDir / "server.jar"
-    print(f"Downloading server.jar to {destination}...")
-    downloadFile(serverJarUrl, destination)
-    printStatus("server.jar", True, str(destination))
-
-
-def handleCurseforgeServer(config: EnvironmentConfig) -> None:
-    print("Preparing CURSEFORGE server bootstrap...")
-
-    eulaPath = createEulaFile(config.workingDir)
-    printStatus("EULA file", True, str(eulaPath))
-
-    if config.curseforgeApiToken is None or config.curseforgeModpackId is None:
-        raise CurseForgeApiError("CurseForge configuration is incomplete; missing API token or modpack ID")
-
-    with CurseForgeClient(config.curseforgeApiToken) as curseforgeClient:
-        print("Fetching modpack metadata from CurseForge...")
-        modpackResponse = curseforgeClient.getLatestModpackFile(config.curseforgeModpackId)
-        printStatus("CurseForge API", True, f"{len(modpackResponse.data)} file(s) returned")
-
-        downloadUrl = extractDownloadUrl(modpackResponse)
-        if downloadUrl is None:
-            printStatus("Modpack download URL", False, "not present in API response")
-            raise CurseForgeApiError("Modpack download URL not found in CurseForge API response")
-        printStatus("Modpack download URL", True, downloadUrl)
-
-        print("Downloading modpack archive...")
-        modpackData = curseforgeClient.downloadModpackFile(downloadUrl)
-        printStatus("Modpack download", True, f"{len(modpackData)} bytes")
-
-    print("Extracting modpack archive...")
-    extractZipArchive(modpackData, config.workingDir)
-    printStatus("Modpack extraction", True, str(config.workingDir))
-
-    print("CurseForge modpack server setup completed successfully.")
-
-
-def main() -> None:
-    try:
-        config = collectEnvironment()
-        if config.serverType == ServerType.VANILLA:
-            handleVanillaServer(config)
-        elif config.serverType == ServerType.CURSEFORGE:
-            handleCurseforgeServer(config)
-        else:
-            raise NotImplementedError(f"Server type '{config.serverType.toString()}' is not implemented yet")
-    except NotImplementedError as exc:
-        print(f"Error: {exc}")
-        sys.exit(2)
-    except ApplicationError as exc:
-        print(f"Error: {exc}")
-        sys.exit(1)
+def buildServerProperties(pairs: list[str]) -> Dict[str, str]:
+    config: Dict[str, str] = {}
+    for pair in pairs:
+        if "=" not in pair:
+            parser.error(f"Server property must look like KEY=VALUE: {pair}")
+        key, value = pair.split("=", 1)
+        config[key.strip()] = value.strip()
+    return config
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        args = parser.parse_args()
+
+        if not args.accept_eula:
+            raise parser.error(
+                "The EULA must be accepted to bootstrap a server")
+
+        destination = Path(args.destination)
+        destination.mkdir(parents=True, exist_ok=True)
+
+        eula_file = destination / "eula.txt"
+        if not eula_file.exists():
+            eula_file.write_text(
+                "#By changing the setting below to TRUE you are indicating your agreement to our EULA (https://aka.ms/MinecraftEULA).\neula=true")
+
+        if args.type == "vanilla":
+            if args.version is None:
+                raise parser.error(
+                    "The Minecraft version is required for vanilla bootstrap")
+
+            vanillaBootstrap(args.version, destination)
+        # elif args.type == "curseforge":
+        #     curseforgeBootstrap(args.server_pack_url, args.destination)
+        elif args.type == "manual":
+            if args.server_pack_url is None:
+                raise parser.error(
+                    "The server pack URL is required for manual bootstrap")
+
+            manualBootstrap(args.server_pack_url, destination)
+
+        serverProperties = buildServerProperties(args.server_properties)
+        if serverProperties:
+            customizeServerProperties(destination, serverProperties)
+
+        if args.server_icon_url is not None:
+            downloadServerIcon(args.server_icon_url,
+                               destination / "server-icon.png")
+    except ApplicationError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        raise SystemExit(1)
