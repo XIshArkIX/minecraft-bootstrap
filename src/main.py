@@ -24,6 +24,8 @@ parser.add_argument("--server-icon-url", type=str,
                     help="The URL of the server icon to use")
 parser.add_argument("--pass-if-exists", type=bool, required=False,
                     help="Pass if the modpack already exists in the destination directory", default=False)
+parser.add_argument("--force-install", type=bool, required=False,
+                    help="Force the installation of the server", default=False)
 parser.add_argument("--server-property",
                     dest="server_properties",
                     action="append",
@@ -56,9 +58,12 @@ if __name__ == "__main__":
         files = destination.glob("*")
         has_files = any([file.name != "eula.txt" for file in files])
 
-        if has_files and not args.pass_if_exists:
-            raise parser.error(
-                "The destination directory is not empty. Use --pass-if-exists to overwrite it")
+        if has_files:
+            if args.pass_if_exists:
+                SystemExit(0)
+            if not args.force_install:
+                raise parser.error(
+                    "The destination directory is not empty. Use --pass-if-exists to overwrite it")
 
         eula_file = destination / "eula.txt"
         if not eula_file.exists():
