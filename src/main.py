@@ -60,10 +60,10 @@ if __name__ == "__main__":
 
         if has_files:
             if args.pass_if_exists:
-                SystemExit(0)
+                raise SystemExit(0)
             if not args.force_install:
                 raise parser.error(
-                    "The destination directory is not empty. Use --pass-if-exists to overwrite it")
+                    "The destination directory is not empty. Use --force-install to overwrite it")
 
         eula_file = destination / "eula.txt"
         if not eula_file.exists():
