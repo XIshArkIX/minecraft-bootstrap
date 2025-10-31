@@ -13,3 +13,4 @@ include/
 *.pyz
 *.pywz
 *.pyzw
+pyvenv.cfg
