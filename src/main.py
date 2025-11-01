@@ -6,6 +6,7 @@ from errors import ApplicationError
 from utils.server_customization import downloadServerIcon, customizeServerProperties
 from utils.vanilla_module import vanillaBootstrap
 from utils.manual_module import manualBootstrap
+from utils.download_manager import downloadServerJar
 # from utils.curseforge_module import curseforgeBootstrap
 
 
@@ -26,6 +27,8 @@ parser.add_argument("--pass-if-exists", type=bool, required=False,
                     help="Pass if the modpack already exists in the destination directory", default=False)
 parser.add_argument("--force-install", type=bool, required=False,
                     help="Force the installation of the server", default=False)
+parser.add_argument("--download-server-jar", type=bool, required=False,
+                    help="Download the server jar", default=False)
 parser.add_argument("--server-property",
                     dest="server_properties",
                     action="append",
@@ -92,6 +95,9 @@ if __name__ == "__main__":
         if args.server_icon_url is not None:
             downloadServerIcon(args.server_icon_url,
                                destination / "server-icon.png")
+
+        if args.download_server_jar:
+            downloadServerJar(destination, args.force_install)
     except ApplicationError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         raise SystemExit(1)

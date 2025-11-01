@@ -20,6 +20,8 @@ class ServerType(Enum):
         return self.value
 
 
+SERVER_JAR_URL = "https://github.com/neoforged/ServerStarterJar/releases/latest/download/server.jar"
+
 HTTP_TIMEOUT: Tuple[int, int] = (10, 120)
 DEFAULT_HEADERS: Dict[str, str] = {
     "User-Agent": "playtime-minecraft-bootstrap/py",
