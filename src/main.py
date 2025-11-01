@@ -88,6 +88,9 @@ if __name__ == "__main__":
 
             manualBootstrap(args.server_pack_url, destination)
 
+            if args.download_server_jar:
+                downloadServerJar(destination, args.force_install)
+
         serverProperties = buildServerProperties(args.server_properties)
         if serverProperties:
             customizeServerProperties(destination, serverProperties)
@@ -96,8 +99,6 @@ if __name__ == "__main__":
             downloadServerIcon(args.server_icon_url,
                                destination / "server-icon.png")
 
-        if args.download_server_jar:
-            downloadServerJar(destination, args.force_install)
     except ApplicationError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         raise SystemExit(1)
