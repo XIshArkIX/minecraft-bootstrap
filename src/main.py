@@ -33,7 +33,7 @@ parser.add_argument("--server-property",
                     dest="server_properties",
                     action="append",
                     default=[],
-                    metavar="KEY=VALUE",
+                    metavar="key=value",
                     help="Override entries in server.properties (can be passed multiple times)")
 
 
@@ -41,7 +41,7 @@ def buildServerProperties(pairs: list[str]) -> Dict[str, str]:
     config: Dict[str, str] = {}
     for pair in pairs:
         if "=" not in pair:
-            parser.error(f"Server property must look like KEY=VALUE: {pair}")
+            parser.error(f"Server property must look like key=value: {pair}")
         key, value = pair.split("=", 1)
         config[key.strip()] = value.strip()
     return config

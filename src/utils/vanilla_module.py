@@ -45,7 +45,7 @@ def downloadServerJar(url: str, destination: Path) -> bool:
 
 
 def vanillaBootstrap(version: str, destination: Path) -> bool:
-    print(f"Bootstrapping vanilla server {version}", flush=True)
+    print(f"Bootstrapping vanilla server with {version=}", flush=True)
     serverJarUrl = fetchServerJarUrl(version)
     if serverJarUrl is None:
         raise InstallationError(
