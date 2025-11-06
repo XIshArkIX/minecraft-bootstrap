@@ -1,0 +1,130 @@
+# https://kubernetes.io/docs/concepts/workloads/controllers/deployment/
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minecraft-deployment
+  namespace: apps
+  labels:
+    app: minecraft-app
+spec:
+  selector:
+    matchLabels:
+      app: minecraft-app
+  replicas: 1
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: minecraft-app
+      labels:
+        app: minecraft-app
+    spec:
+      initContainers:
+        - name: minecraft-bootstrap 
+          image: ghcr.io/xisharkix/minecraft-bootstrap:0.0.1-rc8
+          imagePullPolicy: IfNotPresent
+          command:
+            - "python"
+            - "/app/src/main.py"
+            - "--accept-eula=yes"
+            - "--type=manual"
+            # - "--force-install=yes"
+            - "--pass-if-exists=yes"
+            - "--download-server-jar=yes"
+            - "--destination=/data"
+            - "--server-pack-url=https://edge.forgecdn.net/files/6774/635/Minecraft_Legendary_Edition_1.20.1_2.15_server_pack.zip"
+            # this does not work tbh
+            - "--server-icon-url=https://static.wikia.nocookie.net/stardew-valley-minecraft-datapack/images/e/eb/Jasmine_Tea.png"
+            - "--server-property=motd='Welcome to the tea party'"
+            - "--server-property=enable-command-block=false"
+            - "--server-property=enforce-whitelist=false"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 1Mi
+            limits:
+              cpu: 1000m
+              memory: 4Gi
+          volumeMounts:
+            - name: minecraft-data
+              mountPath: /data
+        - name: fixer
+          image: busybox:1.37
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+          # you can try it with JAVA 21, but I have no luck
+          # also there is bindings for external Yggdrasil auth; you can safely remove it
+          args:
+            - |
+              set -e
+              chmod +x /data/start.sh || echo "Chmod not needed"
+              # sed -i 's/RECOMMENDED_JAVA_VERSION=17/RECOMMENDED_JAVA_VERSION=21/' /data/variables.txt
+              sed -i 's/WAIT_FOR_USER_INPUT=true/WAIT_FOR_USER_INPUT=false/' /data/variables.txt
+              sed -i 's/JAVA_ARGS="-Xmx4G -Xms4G"/JAVA_ARGS="-Xmx10G -Xms2G -Dminecraft.api.env=custom -Dminecraft.api.auth.host=http:\/\/drasl-svc.apps.svc.cluster.local:80\/auth -Dminecraft.api.account.host=http:\/\/drasl-svc.apps.svc.cluster.local:80\/account -Dminecraft.api.session.host=http:\/\/drasl-svc.apps.svc.cluster.local:80\/session -Dminecraft.api.services.host=http:\/\/drasl-svc.apps.svc.cluster.local:80\/services"/' /data/variables.txt
+              sed -i 's/SERVERSTARTERJAR_FORCE_FETCH=true/SERVERSTARTERJAR_FORCE_FETCH=false/' /data/variables.txt
+          resources:
+            requests:
+              cpu: 100m
+              memory: 1Mi
+            limits:
+              cpu: 1000m
+              memory: 4Gi
+          volumeMounts:
+            - name: minecraft-data
+              mountPath: /data
+      containers:
+        - name: minecraft-app
+          image: azul/zulu-openjdk:17
+          imagePullPolicy: IfNotPresent
+          command: ['bash', '/data/start.sh']
+          # resources are fair enough for this modpack
+          resources:
+            requests:
+              cpu: 2000m
+              memory: 4G
+            limits:
+              cpu: 8000m
+              memory: 14G
+          # probes are off because of the long time to get started
+          # livenessProbe:
+          #   tcpSocket:
+          #     port: 25565
+          #   initialDelaySeconds: 5
+          #   timeoutSeconds: 5
+          #   successThreshold: 1
+          #   failureThreshold: 3
+          #   periodSeconds: 10
+          # readinessProbe:
+          #   tcpSocket:
+          #     port: 25565
+          #   initialDelaySeconds: 1200
+          #   timeoutSeconds: 2
+          #   successThreshold: 1
+          #   failureThreshold: 3
+          #   periodSeconds: 10
+
+          # we know where java is but azul/zulu-openjdk does not set it properly for some reason
+          env:
+            - name: JAVA
+              value: "/usr/bin/java"
+          ports:
+            - containerPort: 25565
+              name: minecraft-app
+          volumeMounts:
+            - name: minecraft-data
+              mountPath: /data
+      volumes:
+        # yeah. you also need pre-existed PVC for this
+        - name: minecraft-data
+          persistentVolumeClaim:
+            claimName: minecraft-data-pvc
+      restartPolicy: Always
+---
+
+
