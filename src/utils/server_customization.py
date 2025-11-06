@@ -26,7 +26,7 @@ def downloadServerIcon(url: str, destination: Path) -> bool:
     if image.format != "png":
         image.save(destination_file, format="PNG", sizes=[(64, 64)])
     else:
-        image.save(destination_file)
+        image.save(destination_file, sizes=[(64, 64)])
 
     print(f"OK")
     return True
