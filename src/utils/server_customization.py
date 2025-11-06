@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Dict
+from PIL import Image
 import requests
 from constants import (
     DEFAULT_HEADERS,
@@ -8,6 +9,7 @@ from constants import (
     HTTP_TIMEOUT,
 )
 from errors import DownloadError
+import io
 
 
 def downloadServerIcon(url: str, destination: Path) -> bool:
@@ -17,7 +19,15 @@ def downloadServerIcon(url: str, destination: Path) -> bool:
     if response.status_code != 200:
         raise DownloadError(
             f"Failed to download server icon from {url}: {response.status_code}")
-    destination.write_bytes(response.content)
+
+    destination_file = destination / "server-icon.png"
+    image = Image.open(io.BytesIO(response.content))
+
+    if image.format != "png":
+        image.save(destination_file, format="PNG", sizes=[(64, 64)])
+    else:
+        image.save(destination_file)
+
     print(f"OK")
     return True
 

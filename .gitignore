@@ -14,3 +14,4 @@ include/
 *.pywz
 *.pyzw
 pyvenv.cfg
+lib64/

@@ -97,7 +97,7 @@ if __name__ == "__main__":
 
         if args.server_icon_url is not None:
             downloadServerIcon(args.server_icon_url,
-                               destination / "server-icon.png")
+                               destination)
 
     except ApplicationError as exc:
         print(f"Error: {exc}", file=sys.stderr)
